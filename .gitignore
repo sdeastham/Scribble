@@ -1,0 +1,24 @@
+# .NET / Visual Studio / Rider build artifacts
+bin/
+obj/
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.cache
+*.log
+
+# Publish & packages
+publish/
+packages/
+*.nupkg
+
+# OS & editor junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Generated diagnostic outputs
+selftest_result.txt
