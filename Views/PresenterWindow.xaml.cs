@@ -22,6 +22,7 @@ public partial class PresenterWindow : Window
     private AudienceWindow? _audienceWindow;
     private bool _isClosingConfirmed;
     private bool _isFullscreen;
+    private bool _isSwappingScreens;
 
     public PresenterWindow(string? initialPdfPath = null)
     {
@@ -53,6 +54,9 @@ public partial class PresenterWindow : Window
 
     private void PresenterWindow_LocationChanged(object? sender, EventArgs e)
     {
+        if (_isSwappingScreens) return;
+
+        UpdateDisplayStatus();
         if (_audienceWindow != null && _session.IsLoaded)
         {
             PositionAudienceWindow();
@@ -219,10 +223,49 @@ public partial class PresenterWindow : Window
         if (monitors.Count >= 2)
         {
             DisplayStatusText.Text = $"{monitors.Count} displays detected — Audience view will open fullscreen on Screen 2";
+            SwapScreensButton.Visibility = Visibility.Visible;
         }
         else
         {
             DisplayStatusText.Text = "1 display detected — Running in standalone Presenter mode";
+            SwapScreensButton.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void SwapScreens()
+    {
+        var monitors = MonitorService.GetMonitors();
+        if (monitors.Count < 2)
+        {
+            UpdateDisplayStatus();
+            return;
+        }
+
+        MonitorBounds? currentPresenterMonitor = MonitorService.GetMonitorForWindow(this);
+        MonitorBounds? otherMonitor = MonitorService.GetSecondaryMonitor(this);
+        if (currentPresenterMonitor == null || otherMonitor == null)
+        {
+            return;
+        }
+
+        _isSwappingScreens = true;
+        try
+        {
+            // Move Presenter to the other display, and Audience onto the previous Presenter display
+            MonitorService.MoveWindowToMonitor(this, otherMonitor, maximize: true);
+
+            if (_audienceWindow != null && _session.IsLoaded)
+            {
+                _audienceWindow.ShowOnMonitor(currentPresenterMonitor);
+            }
+
+            Activate();
+        }
+        finally
+        {
+            Dispatcher.BeginInvoke(
+                System.Windows.Threading.DispatcherPriority.Loaded,
+                () => _isSwappingScreens = false);
         }
     }
 
@@ -390,6 +433,7 @@ public partial class PresenterWindow : Window
     private void NextSlideButton_Click(object sender, RoutedEventArgs e) => _session.GoNext();
     private void ResetZoomPill_Click(object sender, RoutedEventArgs e) => Viewport.ResetZoom();
     private void EraserButton_Click(object sender, RoutedEventArgs e) => _session.ToggleEraserMode();
+    private void SwapScreensButton_Click(object sender, RoutedEventArgs e) => SwapScreens();
     private void ResetStrokeSizeButton_Click(object sender, RoutedEventArgs e) => _session.ResetStrokeWidthScale();
     private void StrokeSizeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) =>
         _session.SetStrokeWidthScale(e.NewValue);
@@ -429,6 +473,14 @@ public partial class PresenterWindow : Window
     private void Window_KeyDown(object sender, KeyEventArgs e)
     {
         bool ctrl = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
+        bool shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+
+        if (ctrl && shift && e.Key == Key.S)
+        {
+            SwapScreens();
+            e.Handled = true;
+            return;
+        }
 
         if (ctrl && e.Key == Key.O)
         {

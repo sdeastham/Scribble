@@ -237,9 +237,28 @@
                           Height="18" />
                 </Button>
 
+                <!-- Swap Presenter / Audience Screens (shown only when 2+ displays are connected) -->
+                <Button x:Name="SwapScreensButton"
+                        DockPanel.Dock="Top"
+                        Style="{StaticResource RailButtonStyle}"
+                        Height="38"
+                        Margin="0,6,0,0"
+                        Visibility="Collapsed"
+                        ToolTip="Swap Presenter &amp; Audience Screens (Ctrl+Shift+S)"
+                        Click="SwapScreensButton_Click">
+                    <Path Data="M 3,7 L 15,7 M 12,4 L 15,7 L 12,10 M 17,13 L 5,13 M 8,10 L 5,13 L 8,16"
+                          Stroke="{StaticResource TextPrimaryBrush}"
+                          StrokeThickness="1.8"
+                          StrokeStartLineCap="Round"
+                          StrokeEndLineCap="Round"
+                          StrokeLineJoin="Round"
+                          Width="20"
+                          Height="20" />
+                </Button>
+
                 <Rectangle DockPanel.Dock="Top"
                            Height="1"
-                           Margin="14,14,14,14"
+                           Margin="14,10,14,10"
                            Fill="{StaticResource BorderBrush}" />
 
                 <!-- 2. Pen Color Swatches (Black, Blue, Red, Green) & Stroke Eraser -->

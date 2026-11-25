@@ -9,6 +9,10 @@ public sealed record MonitorBounds(
     int TopPx,
     int WidthPx,
     int HeightPx,
+    int WorkLeftPx,
+    int WorkTopPx,
+    int WorkWidthPx,
+    int WorkHeightPx,
     bool IsPrimary,
     string DeviceName);
 
@@ -40,6 +44,10 @@ public static class MonitorService
                         info.rcMonitor.Top,
                         info.rcMonitor.Right - info.rcMonitor.Left,
                         info.rcMonitor.Bottom - info.rcMonitor.Top,
+                        info.rcWork.Left,
+                        info.rcWork.Top,
+                        info.rcWork.Right - info.rcWork.Left,
+                        info.rcWork.Bottom - info.rcWork.Top,
                         (info.dwFlags & MonitorInfoPrimary) != 0,
                         info.szDevice));
                 }
@@ -55,6 +63,27 @@ public static class MonitorService
             .ToList();
     }
 
+    public static MonitorBounds? GetMonitorForWindow(Window window)
+    {
+        var monitors = GetMonitors();
+        if (monitors.Count == 0) return null;
+
+        IntPtr hwnd = new WindowInteropHelper(window).Handle;
+        if (hwnd != IntPtr.Zero)
+        {
+            IntPtr hMon = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
+            var info = new MONITORINFOEX { cbSize = (uint)Marshal.SizeOf<MONITORINFOEX>() };
+            if (GetMonitorInfo(hMon, ref info))
+            {
+                var match = monitors.FirstOrDefault(m =>
+                    string.Equals(m.DeviceName, info.szDevice, StringComparison.OrdinalIgnoreCase));
+                if (match != null) return match;
+            }
+        }
+
+        return monitors[0];
+    }
+
     public static MonitorBounds? GetSecondaryMonitor(Window presenterWindow)
     {
         var monitors = GetMonitors();
@@ -63,24 +92,40 @@ public static class MonitorService
             return null;
         }
 
-        // Identify which monitor currently hosts the presenter window so we pick the OTHER one
-        IntPtr hwnd = new WindowInteropHelper(presenterWindow).Handle;
-        if (hwnd != IntPtr.Zero)
+        MonitorBounds? current = GetMonitorForWindow(presenterWindow);
+        if (current != null)
         {
-            IntPtr presenterMonitor = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
-            var info = new MONITORINFOEX { cbSize = (uint)Marshal.SizeOf<MONITORINFOEX>() };
-            if (GetMonitorInfo(presenterMonitor, ref info))
+            var other = monitors.FirstOrDefault(m =>
+                !string.Equals(m.DeviceName, current.DeviceName, StringComparison.OrdinalIgnoreCase));
+            if (other != null)
             {
-                var other = monitors.FirstOrDefault(m =>
-                    !string.Equals(m.DeviceName, info.szDevice, StringComparison.OrdinalIgnoreCase));
-                if (other != null)
-                {
-                    return other;
-                }
+                return other;
             }
         }
 
         return monitors.FirstOrDefault(m => !m.IsPrimary) ?? monitors[1];
+    }
+
+    public static void MoveWindowToMonitor(Window window, MonitorBounds target, bool maximize)
+    {
+        bool wasMaximized = window.WindowState == WindowState.Maximized;
+        if (wasMaximized)
+        {
+            window.WindowState = WindowState.Normal;
+        }
+
+        IntPtr hwnd = new WindowInteropHelper(window).EnsureHandle();
+        int width = Math.Min(target.WorkWidthPx, Math.Max(800, (int)(target.WorkWidthPx * 0.85)));
+        int height = Math.Min(target.WorkHeightPx, Math.Max(600, (int)(target.WorkHeightPx * 0.85)));
+        int x = target.WorkLeftPx + (target.WorkWidthPx - width) / 2;
+        int y = target.WorkTopPx + (target.WorkHeightPx - height) / 2;
+
+        SetWindowPos(hwnd, IntPtr.Zero, x, y, width, height, SwpNoZOrder | SwpShowWindow);
+
+        if (maximize || wasMaximized)
+        {
+            window.WindowState = WindowState.Maximized;
+        }
     }
 
     public static void PlaceBorderlessFullscreen(Window window, MonitorBounds target, bool activate = false)
